@@ -1,22 +1,44 @@
-FROM jupyter/pyspark-notebook:spark-3.5.0
+# Python 3.12 base (DockerHub images are not updated; use quay.io)
+FROM quay.io/jupyter/base-notebook:python-3.12.7
 
 USER root
 RUN apt-get update && apt-get install -y \
     curl \
     netcat-openbsd \
     postgresql-client \
+    openjdk-17-jdk-headless \
     && rm -rf /var/lib/apt/lists/*
 
-ARG SPARK_VERSION=3.5.6
+# Create stable JAVA_HOME symlink: /usr/lib/jvm/default-java
 RUN set -eux; \
-curl -fSL -o /tmp/spark.tgz "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop3.tgz"; \
+    JAVA_BIN="$(readlink -f "$(command -v java)")"; \
+    JAVA_HOME_DIR="$(dirname "$(dirname "$JAVA_BIN")")"; \
+    echo "Detected JAVA_HOME=$JAVA_HOME_DIR"; \
+    ln -sfn "$JAVA_HOME_DIR" /usr/lib/jvm/default-java
+
+ENV JAVA_HOME=/usr/lib/jvm/default-java
+ENV PATH="$JAVA_HOME/bin:$PATH"
+
+ARG SPARK_VERSION=3.5.6
+
+# Install Spark 3.5.6
+RUN set -eux; \
+    curl -fSL -o /tmp/spark.tgz "https://archive.apache.org/dist/spark/spark-${SPARK_VERSION}/spark-${SPARK_VERSION}-bin-hadoop3.tgz"; \
     tar -xzf /tmp/spark.tgz -C /opt; \
     mv "/opt/spark-${SPARK_VERSION}-bin-hadoop3" /opt/spark; \
     rm /tmp/spark.tgz
+
 ENV SPARK_HOME=/opt/spark
 ENV PATH="$SPARK_HOME/bin:$PATH"
 
+# Ensure both driver and executors use "python" (Python 3.12 inside this image),
+# and ensure PySpark is imported from /opt/spark.
+ENV PYSPARK_PYTHON=python
+ENV PYSPARK_DRIVER_PYTHON=python
+ENV PYTHONPATH="$SPARK_HOME/python:$SPARK_HOME/python/lib/py4j-0.10.9.7-src.zip"
+
 USER $NB_UID
+
 RUN pip install --no-cache-dir \
     trino[sqlalchemy] \
     sqlalchemy-trino \
