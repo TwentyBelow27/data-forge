@@ -2,10 +2,12 @@ FROM debezium/connect:3.0.0.Final
 
 USER root
 
+# Устанавливаем unzip (больше не нужен для avro-конвертера, оставлен на случай других нужд)
 RUN microdnf install -y unzip \
- && curl -fsSL https://hub-downloads.confluent.io/api/plugins/confluentinc/kafka-connect-avro-converter/versions/8.0.0/confluentinc-kafka-connect-avro-converter-8.0.0.zip -o /tmp/avro-converter.zip \
- && unzip -q /tmp/avro-converter.zip -d /kafka/connect \
- && rm -f /tmp/avro-converter.zip \
+ && mkdir -p /kafka/connect/apicurio-avro-converter \
+ && curl -fsSL \
+    https://repo1.maven.org/maven2/io/apicurio/apicurio-registry-distro-connect-converter/2.5.11.Final/apicurio-registry-distro-connect-converter-2.5.11.Final.jar \
+    -o /kafka/connect/apicurio-avro-converter/apicurio-registry-distro-connect-converter-2.5.11.Final.jar \
  && microdnf clean all
 
 COPY config /kafka/connectors
